@@ -8,6 +8,7 @@
 4. [Налаштування Google Drive API](#4-налаштування-google-drive-api)
 5. [Створення конфігурації](#5-створення-конфігурації)
 6. [Перший запуск](#6-перший-запуск)
+7. [Вирішення проблем](#вирішення-проблем)
 
 ---
 
@@ -164,27 +165,39 @@ pkill -9 -f chrome
 1. Перейдіть в **"APIs & Services"** → **"Credentials"**
 2. Клікніть **"Create Credentials"** → **"OAuth client ID"**
 
-3. **Якщо з'явиться попередження "Configure consent screen":**
+3. **Налаштування OAuth Consent Screen:**
    - Клікніть **"Configure consent screen"**
    - User Type: **External**
    - Клікніть **"Create"**
-   - App name: **"Webtoons Scraper"**
-   - User support email: **ваш email**
+   
+   **На сторінці "OAuth consent screen":**
+   - App name: **"Webtoons Scraper"** (або будь-яка назва)
+   - User support email: **ваш email** (той, з яким ви увійшли в Google)
    - Developer contact: **ваш email**
    - Натисніть **"Save and Continue"**
-   - **Scopes**: пропустіть (Save and Continue)
-   - **Test users**: пропустіть (Save and Continue)
+   
+   **Scopes (область доступу):**
+   - Просто натисніть **"Save and Continue"** (пропускаємо)
+   
+   **⭐ Test users (ВАЖЛИВО!):**
+   - Натисніть **"+ ADD USERS"**
+   - Введіть **ваш email** (той самий, з яким ви працюєте)
+   - Натисніть **"Add"**
+   - Натисніть **"Save and Continue"**
+   
+   **Summary:**
+   - Перегляньте налаштування
    - Клікніть **"Back to Dashboard"**
 
-4. **Поверніться до створення credentials:**
-   - **"APIs & Services"** → **"Credentials"**
-   - **"Create Credentials"** → **"OAuth client ID"**
+4. **Створення OAuth Client ID:**
+   - Поверніться в **"APIs & Services"** → **"Credentials"**
+   - Клікніть **"Create Credentials"** → **"OAuth client ID"**
    - Application type: **Desktop app**
    - Name: **"Webtoons Scraper Client"**
    - Клікніть **"Create"**
 
 5. **Завантаження credentials:**
-   - Клікніть **"Download JSON"**
+   - Клікніть **"Download JSON"** на екрані, що з'явиться
    - **Перейменуйте** файл на `credentials.json`
    - **Помістіть** в папку зі скриптом
 
@@ -412,12 +425,59 @@ WEBTOONS SCRAPER v3.1
 
 ## Вирішення проблем
 
+### ⚠️ Помилка 403: "Додаток не пройшов процедуру підтвердження від Google"
+
+**Симптоми:**
+При першому запуску скрипта відкривається браузер з повідомленням:
+```
+Додаток [назва_вашого_проекту] не пройшов процедуру підтвердження від Google
+This app hasn't been verified by Google
+```
+
+**Причина:**
+Ваш проєкт у Google Cloud Console перебуває в режимі тестування ("Testing"), і ви не додали свій email до списку тестувальників.
+
+**✅ Рішення:**
+
+1. **Відкрийте [Google Cloud Console](https://console.cloud.google.com/)**
+
+2. **Оберіть правильний проєкт:**
+   - Вгорі сторінки клікніть на назву проєкту
+   - Оберіть проєкт, який ви створили для Webtoons Scraper
+
+3. **Перейдіть до OAuth consent screen:**
+   - В меню зліва: **"APIs & Services"** → **"OAuth consent screen"**
+
+4. **Додайте себе як тестувальника:**
+   - Знайдіть розділ **"Test users"** (Тестувальники)
+   - Натисніть кнопку **"+ ADD USERS"**
+   - Введіть **ваш email** (той самий, з яким ви працюєте в Google)
+   - Натисніть **"Add"** або **"Save"**
+   - Прокрутіть вниз і натисніть **"Save"** ще раз
+
+5. **Перезапустіть скрипт:**
+   ```bash
+   python webtoons_scraper.py
+   ```
+
+6. **Тепер при OAuth ви побачите:**
+   - Екран вибору акаунту
+   - Попередження "Google hasn't verified this app" - це нормально
+   - Натисніть **"Advanced"** → **"Go to [назва проєкту] (unsafe)"**
+   - Натисніть **"Allow"**
+
+**Важливо:** Це попередження з'являється тільки для додатків у режимі тестування. Оскільки це ваш особистий проєкт для власного використання, це абсолютно безпечно.
+
+---
+
 ### "credentials.json not found"
 
 **Рішення:**
 1. Завантажте credentials.json з Google Cloud Console
 2. Перейменуйте на `credentials.json` (маленькими літерами)
 3. Помістіть в папку зі скриптом
+
+---
 
 ### "ChromeDriver version mismatch"
 
@@ -427,6 +487,8 @@ WEBTOONS SCRAPER v3.1
 ```bash
 pip install --upgrade webdriver-manager
 ```
+
+---
 
 ### "Chrome is already running" (тільки для існуючого профілю)
 
@@ -439,6 +501,8 @@ pkill -9 -f chrome
 # Windows (Task Manager):
 # Закрийте всі процеси chrome.exe
 ```
+
+---
 
 ### "No images found"
 
@@ -461,6 +525,8 @@ pkill -9 -f chrome
 }
 ```
 
+---
+
 ### "⚠ Завантажено з попередженням"
 
 **Що це означає:**
@@ -470,6 +536,8 @@ pkill -9 -f chrome
 1. Зазвичай це не критично - Google Drive може трохи стискати файли
 2. Якщо хочете перевірити - завантажте файл з Drive і порівняйте візуально
 3. Якщо проблема повторюється часто - повідомте в Issues
+
+---
 
 ### Папки створюються не там, де потрібно
 
@@ -486,6 +554,24 @@ pkill -9 -f chrome
   }
 }
 ```
+
+---
+
+### Помилка при повторному запуску після зміни email тестувальника
+
+**Симптоми:**
+Після додавання email до тестувальників, скрипт все одно видає помилку 403.
+
+**Рішення:**
+1. Видаліть файл `token.json`:
+   ```bash
+   rm token.json
+   ```
+2. Запустіть скрипт знову:
+   ```bash
+   python webtoons_scraper.py
+   ```
+3. Пройдіть OAuth авторизацію заново
 
 ---
 
