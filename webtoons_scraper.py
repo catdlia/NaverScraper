@@ -1,5 +1,5 @@
 """
-Webtoons Scan Scraper - GitHub Release v3.0
+Webtoons Scan Scraper - GitHub Release v3.1
 
 Скрипт для завантаження сканів з translate.webtoons.com на Google Drive
 """
@@ -31,14 +31,13 @@ from googleapiclient.http import MediaIoBaseUpload
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ============================================================================
-# CONFIGURATION - ЗАВАНТАЖУЄТЬСЯ З config.json
+# CONFIGURATION
 # ============================================================================
 
 def load_config():
     """Завантажує конфігурацію з config.json"""
     config_file = 'config.json'
-    
-    # Якщо config.json не існує, створюємо з прикладу
+
     if not os.path.exists(config_file):
         if os.path.exists('config.example.json'):
             print("⚠ config.json не знайдено!")
@@ -49,19 +48,16 @@ def load_config():
                 json.dump(example, f, indent=2, ensure_ascii=False)
             print("✓ config.json створено!")
             print("\n⚠ УВАГА: Відредагуйте config.json перед запуском!")
-            print("   - Вкажіть шлях до вашого Chrome профілю")
-            print("   - Вкажіть ID вашої папки Google Drive (опціонально)")
             input("\nНатисніть Enter після редагування config.json...")
         else:
             raise FileNotFoundError(
                 "config.json та config.example.json не знайдено!\n"
                 "Створіть config.json на основі прикладу з документації."
             )
-    
+
     with open(config_file, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# Завантажуємо конфігурацію
 CONFIG = load_config()
 
 # Chrome налаштування
@@ -82,9 +78,8 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 CREDENTIALS_FILE = CONFIG['google_drive']['credentials_file']
 TOKEN_FILE = CONFIG['google_drive']['token_file']
 
-BASE_FOLDER_NAME = CONFIG['google_drive']['base_folder_name']
-SUBFOLDER_NAME = CONFIG['google_drive']['subfolder_name']
-OVERRIDE_BASE_FOLDER_ID = CONFIG['google_drive'].get('override_base_folder_id', None)
+# ⭐ НОВА СПРОЩЕНА СТРУКТУРА
+FOLDER_PATH = CONFIG['google_drive'].get('folder_path', 'скани')  # За замовчуванням "скани"
 
 # ============================================================================
 # WebDriver Setup
@@ -152,41 +147,64 @@ def find_or_create_folder(service, folder_name, parent_id=None):
 
 
 def create_folder_structure(service, episode_no):
-    """Створює структуру папок в Google Drive."""
+    """
+    ⭐ СПРОЩЕНА ВЕРСІЯ: Створює структуру папок за шляхом з config.json
+
+    Приклади шляхів:
+    - "скани" -> створює папку "скани" в корені
+    - "TOG/скани" -> створює TOG/скани
+    - "TOG/нові розділи/скани" -> створює TOG/нові розділи/скани
+
+    Завжди додає підпапку з номером епізоду: шлях/{episode_no}/
+    """
     print(f"Налаштування папок для епізоду {episode_no}...")
 
-    if OVERRIDE_BASE_FOLDER_ID:
-        base_folder_id = OVERRIDE_BASE_FOLDER_ID
+    # Розбиваємо шлях на частини
+    path_parts = [part.strip() for part in FOLDER_PATH.split('/') if part.strip()]
+
+    if not path_parts:
+        # Якщо шлях порожній, використовуємо корінь
+        parent_id = None
     else:
-        base_folder_id = find_or_create_folder(service, BASE_FOLDER_NAME)
+        # Створюємо/знаходимо кожну папку в шляху
+        parent_id = None
+        for folder_name in path_parts:
+            parent_id = find_or_create_folder(service, folder_name, parent_id)
 
-    subfolder_id = find_or_create_folder(service, SUBFOLDER_NAME, base_folder_id)
-    episode_folder_id = find_or_create_folder(service, str(episode_no), subfolder_id)
-    scans_folder_id = find_or_create_folder(service, "scans", episode_folder_id)
+    # Створюємо папку з номером епізоду
+    episode_folder_id = find_or_create_folder(service, str(episode_no), parent_id)
 
+    return episode_folder_id
+
+
+def verify_uploaded_file(service, file_id, original_size):
+    """
+    ⭐ НОВА ФУНКЦІЯ: Перевіряє правильність завантаженого файлу
+
+    Returns:
+        bool: True якщо файл валідний
+    """
     try:
-        service.files().get(fileId=scans_folder_id, fields='id').execute()
-    except Exception as e:
-        print(f"  ⚠ Попередження: перестворення папки...")
-        scans_folder_id = service.files().create(
-            body={
-                'name': 'scans',
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [episode_folder_id]
-            },
-            fields='id'
-        ).execute()['id']
+        # Отримуємо метадані файлу з Drive
+        file_metadata = service.files().get(fileId=file_id, fields='size,md5Checksum').execute()
 
-    return scans_folder_id
+        uploaded_size = int(file_metadata.get('size', 0))
+
+        # Перевіряємо розмір (допускаємо відхилення 1%)
+        size_diff = abs(uploaded_size - original_size) / original_size
+        if size_diff > 0.01:
+            print(f"    ⚠ Розмір не співпадає: {uploaded_size} != {original_size}")
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"    ⚠ Помилка перевірки: {e}")
+        return False
 
 
 def upload_to_drive(service, file_data, filename, folder_id):
-    """Завантажує файл на Google Drive."""
-    try:
-        service.files().get(fileId=folder_id, fields='id').execute()
-    except Exception as e:
-        raise ValueError(f"Невалідний ID папки: {folder_id}. Помилка: {e}")
-
+    """Завантажує файл на Google Drive з перевіркою."""
     file_metadata = {'name': filename, 'parents': [folder_id]}
 
     mimetype = 'image/png'
@@ -199,10 +217,20 @@ def upload_to_drive(service, file_data, filename, folder_id):
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id'
+            fields='id,size'
         ).execute()
-        print(f"  ✓ Завантажено: {filename}")
-        return file.get('id')
+
+        file_id = file.get('id')
+        original_size = len(file_data)
+
+        # ⭐ Перевірка завантаження
+        if verify_uploaded_file(service, file_id, original_size):
+            print(f"  ✓ Завантажено: {filename} ({original_size/1024:.1f} KB)")
+        else:
+            print(f"  ⚠ Завантажено з попередженням: {filename}")
+
+        return file_id
+
     except Exception as e:
         print(f"  ✗ Помилка завантаження {filename}: {e}")
         raise
@@ -240,12 +268,7 @@ def setup_selenium_driver():
 
 
 def wait_for_network_idle_and_collect_images(driver, timeout=30, idle_time=2):
-    """
-    Очікує завершення Network запитів та збирає URLs зображень.
-    
-    Returns:
-        list: URLs зображень, знайдених під час очікування
-    """
+    """Очікує завершення Network запитів та збирає URLs зображень."""
     print(f"Очікування завершення завантаження (макс {timeout}с)...", end=" ", flush=True)
 
     import json
@@ -313,12 +336,7 @@ def extract_filename_from_url(url):
 
 
 def get_image_dimensions_and_size(img_url, cookies_dict):
-    """
-    Завантажує зображення та отримує його властивості.
-    
-    Returns:
-        tuple: (width, height, size_kb, img_data, filename) або None
-    """
+    """Завантажує зображення та отримує його властивості."""
     try:
         response = requests.get(img_url, cookies=cookies_dict, timeout=20)
 
@@ -469,8 +487,8 @@ def process_episode(driver, drive_service, webtoon_no, episode_no, is_first_epis
     url = f"https://translate.webtoons.com/translate/tool?webtoonNo={webtoon_no}&episodeNo={episode_no}&language=UKR&teamVersion=0"
 
     try:
-        scans_folder_id = create_folder_structure(drive_service, episode_no)
-        print("✓ Папка Google Drive готова\n")
+        folder_id = create_folder_structure(drive_service, episode_no)
+        print(f"✓ Папка Google Drive готова: {FOLDER_PATH}/{episode_no}/\n")
     except Exception as e:
         print(f"✗ Помилка налаштування папок: {e}")
         import traceback
@@ -489,16 +507,19 @@ def process_episode(driver, drive_service, webtoon_no, episode_no, is_first_epis
             return True
 
         print("Завантаження на Google Drive...")
+        successful_uploads = 0
+
         for scan in scan_images:
             img_data = scan['data']
             filename = scan['filename']
 
             try:
-                upload_to_drive(drive_service, img_data, filename, scans_folder_id)
+                upload_to_drive(drive_service, img_data, filename, folder_id)
+                successful_uploads += 1
             except Exception as upload_err:
                 print(f"  ✗ Помилка завантаження {filename}: {upload_err}")
 
-        print(f"✓ Епізод {episode_no} успішно оброблено")
+        print(f"\n✓ Епізод {episode_no}: завантажено {successful_uploads}/{len(scan_images)} файлів")
         return True
 
     except Exception as e:
@@ -511,7 +532,7 @@ def process_episode(driver, drive_service, webtoon_no, episode_no, is_first_epis
 def main():
     """Головна функція виконання."""
     print("=" * 70)
-    print("WEBTOONS SCRAPER v3.0")
+    print("WEBTOONS SCRAPER v3.1")
     print("=" * 70)
     print()
 
@@ -530,7 +551,8 @@ def main():
 
     try:
         drive_service = get_google_drive_service()
-        print("✓ Google Drive автентифіковано\n")
+        print("✓ Google Drive автентифіковано")
+        print(f"✓ Структура папок: {FOLDER_PATH}/[номер_епізоду]/\n")
     except Exception as e:
         print(f"✗ Помилка Google Drive: {e}")
         return
@@ -543,6 +565,9 @@ def main():
         print(f"ПАКЕТНЕ ЗАВАНТАЖЕННЯ: Епізоди {start_episode}-{end_episode}")
         print("=" * 70)
 
+        total_success = 0
+        total_failed = 0
+
         for idx, ep_num in enumerate(range(start_episode, end_episode + 1)):
             is_first = (idx == 0)
 
@@ -554,7 +579,10 @@ def main():
                 is_first_episode=is_first
             )
 
-            if not success:
+            if success:
+                total_success += 1
+            else:
+                total_failed += 1
                 print(f"⚠ Помилка обробки епізоду {ep_num}, продовжуємо...")
 
             if ep_num < end_episode:
@@ -563,6 +591,9 @@ def main():
         print("\n" + "=" * 70)
         print("✓ ПАКЕТНЕ ЗАВАНТАЖЕННЯ ЗАВЕРШЕНО!")
         print("=" * 70)
+        print(f"Успішно оброблено: {total_success}")
+        print(f"З помилками: {total_failed}")
+        print(f"Всього: {total_success + total_failed}")
 
     except KeyboardInterrupt:
         print("\n\n⚠ Перервано користувачем (Ctrl+C)")
@@ -574,7 +605,7 @@ def main():
 
     finally:
         if driver:
-            print("Закриття браузера...")
+            print("\nЗакриття браузера...")
             driver.quit()
 
 

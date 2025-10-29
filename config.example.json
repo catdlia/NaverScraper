@@ -15,8 +15,6 @@
   "google_drive": {
     "credentials_file": "credentials.json",
     "token_file": "token.json",
-    "base_folder_name": "TOG",
-    "subfolder_name": "нові розділи",
-    "override_base_folder_id": null
+    "folder_path": "скани"
   }
 }
