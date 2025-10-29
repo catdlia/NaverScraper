@@ -1,0 +1,22 @@
+{
+  "chrome": {
+    "user_data_dir": "~/.config/google-chrome-selenium",
+    "profile": "Default"
+  },
+  "image_filters": {
+    "min_height": 1000,
+    "min_width": 400,
+    "min_aspect_ratio": 1.5,
+    "min_file_size_kb": 100
+  },
+  "performance": {
+    "max_parallel_downloads": 5
+  },
+  "google_drive": {
+    "credentials_file": "credentials.json",
+    "token_file": "token.json",
+    "base_folder_name": "TOG",
+    "subfolder_name": "нові розділи",
+    "override_base_folder_id": null
+  }
+}
