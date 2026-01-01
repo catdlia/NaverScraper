@@ -1,20 +1,11 @@
 {
   "chrome": {
-    "user_data_dir": "~/.config/google-chrome-selenium",
+    "user_data_dir": "/home/ubuntu/.config/google-chrome",
     "profile": "Default"
-  },
-  "image_filters": {
-    "min_height": 1000,
-    "min_width": 400,
-    "min_aspect_ratio": 1.5,
-    "min_file_size_kb": 100
-  },
-  "performance": {
-    "max_parallel_downloads": 5
   },
   "google_drive": {
     "credentials_file": "credentials.json",
     "token_file": "token.json",
-    "folder_path": "скани"
+    "folder_path": "Bato_Scans"
   }
 }
