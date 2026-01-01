@@ -68,7 +68,7 @@ cp config.example.json config.json
 ### 4. Запуск
 
 ```bash
-python webtoons_scraper.py
+python bato_scraper.py
 ```
 
 ## 📖 Використання
